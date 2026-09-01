@@ -1,0 +1,37 @@
+name: Build APK
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Auto Generate Android Files
+        run: |
+          mkdir temp_app
+          cd temp_app
+          flutter create --org com.pragya --project-name pragya_hamali_app .
+          cp -r android ../
+          cd ..
+          rm -rf temp_app
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Build Universal Release APK
+        run: flutter build apk --release
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Pragya-Hamali-App
+          path: build/app/outputs/flutter-apk/app-release.apk
