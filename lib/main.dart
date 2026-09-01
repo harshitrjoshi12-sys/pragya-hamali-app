@@ -26,9 +26,70 @@ class PragyaHamaliApp extends StatelessWidget {
           secondary: const Color(0xFF00D4B2),
         ),
         useMaterial3: true,
-        scaffoldBackgroundColor: const Color(0xFFF6F9FC),
+        scaffoldBackgroundColor: const Color(0xFFF4F7FB),
       ),
       home: const SplashScreen(),
+    );
+  }
+}
+
+// ================= DESIGNABLE BRAND LOGO WIDGET =================
+class PragyaBrandLogo extends StatelessWidget {
+  final double size;
+  final bool isDark;
+
+  const PragyaBrandLogo({super.key, this.size = 60, this.isDark = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(
+          colors: isDark
+              ? [const Color(0xFF0F3959), const Color(0xFF0A2540)]
+              : [const Color(0xFF00E5FF), const Color(0xFF00D4B2)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: (isDark ? const Color(0xFF00D4B2) : const Color(0xFF0A2540)).withOpacity(0.35),
+            blurRadius: size * 0.25,
+            offset: const Offset(0, 4),
+          ),
+        ],
+        border: Border.all(
+          color: isDark ? const Color(0xFF00D4B2).withOpacity(0.5) : Colors.white,
+          width: size * 0.04,
+        ),
+      ),
+      child: Center(
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Opacity(
+              opacity: 0.18,
+              child: Icon(
+                Icons.precision_manufacturing_rounded,
+                size: size * 0.55,
+                color: isDark ? Colors.white : const Color(0xFF0A2540),
+              ),
+            ),
+            Text(
+              'P',
+              style: TextStyle(
+                fontSize: size * 0.52,
+                fontWeight: FontWeight.w900,
+                color: isDark ? const Color(0xFF00D4B2) : const Color(0xFF0A2540),
+                letterSpacing: -1.0,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -43,12 +104,14 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
   late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
   late Animation<double> _fadeAnimation;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 1500));
+    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 1400));
+    _scaleAnimation = CurvedAnimation(parent: _controller, curve: Curves.easeOutBack);
     _fadeAnimation = CurvedAnimation(parent: _controller, curve: Curves.easeIn);
     _controller.forward();
 
@@ -68,42 +131,60 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0A2540),
+      backgroundColor: const Color(0xFF081C30),
       body: Center(
         child: FadeTransition(
           opacity: _fadeAnimation,
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.08),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.factory_outlined, size: 75, color: Color(0xFF00D4B2)),
+              ScaleTransition(
+                scale: _scaleAnimation,
+                child: const PragyaBrandLogo(size: 110, isDark: true),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 28),
               const Text(
                 'PRAGYA PRODUCTS',
-                style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 2.5),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Hamali & Labor Distribution System',
-                style: TextStyle(fontSize: 14, color: Colors.white70, letterSpacing: 0.5),
-              ),
-              const SizedBox(height: 48),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF00D4B2).withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(25),
-                  border: Border.pad(BorderSide(color: const Color(0xFF00D4B2).withOpacity(0.4))),
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                  letterSpacing: 3.0,
                 ),
-                child: const Text(
-                  'Made by Harshit',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF00D4B2), letterSpacing: 1.2),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'INDUSTRIAL HAMALI AUTOMATION',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF88A3BD),
+                  letterSpacing: 1.5,
+                ),
+              ),
+              const SizedBox(height: 50),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF00D4B2).withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(color: const Color(0xFF00D4B2).withOpacity(0.4)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    Icon(Icons.code_rounded, size: 16, color: Color(0xFF00D4B2)),
+                    SizedBox(width: 8),
+                    Text(
+                      'Made by Harshit',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF00D4B2),
+                        letterSpacing: 1.1,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -163,7 +244,7 @@ class HamaliEntry {
       );
 }
 
-// ================= MAIN SCREEN =================
+// ================= MAIN HOME SCREEN =================
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -244,7 +325,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final double? price = double.tryParse(_priceController.text);
 
     if (bags == null || price == null || bags <= 0 || price <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Valid Bags & Price enter karein')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter valid Bags & Rate')));
       return;
     }
 
@@ -252,7 +333,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final String finalWeight = _selectedWeight == 'Custom (Manual)' ? _customWeightController.text.trim() : _selectedWeight;
 
     if (finalWork.isEmpty || finalWeight.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Work Detail & Weight specify karein')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Work Detail & Weight are required')));
       return;
     }
 
@@ -285,9 +366,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _deleteEntry(HamaliEntry entryToDelete) {
     if (_isLocked) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Sheet Locked hai! Unlock karein.')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sheet is Locked! Unlock with PIN to delete.')));
       return;
     }
 
@@ -295,7 +374,7 @@ class _HomeScreenState extends State<HomeScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Delete Entry?'),
-        content: Text('Kya aap S.No #${entryToDelete.sNo} entry delete karna chahte hain?'),
+        content: Text('S.No #${entryToDelete.sNo} entry delete karni hai?'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           ElevatedButton(
@@ -352,9 +431,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _exportPdf() async {
     final filtered = _filteredEntries;
     if (filtered.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Selected date me koi entry nahi hai!')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No entries found for the selected date!')));
       return;
     }
 
@@ -373,17 +450,39 @@ class _HomeScreenState extends State<HomeScreen> {
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
-                  pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  pw.Row(
                     children: [
-                      pw.Text('PRAGYA PRODUCTS', style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold, color: PdfColors.blue900)),
-                      pw.Text('Daily Hamali Distribution Report', style: const pw.TextStyle(fontSize: 14)),
+                      pw.Container(
+                        width: 38,
+                        height: 38,
+                        decoration: const pw.BoxDecoration(
+                          color: PdfColors.blueGrey900,
+                          shape: pw.BoxShape.circle,
+                        ),
+                        child: pw.Center(
+                          child: pw.Text('P', style: pw.TextStyle(color: PdfColors.cyan, fontSize: 22, fontWeight: pw.FontWeight.bold)),
+                        ),
+                      ),
+                      pw.SizedBox(width: 12),
+                      pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text('PRAGYA PRODUCTS', style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold, color: PdfColors.blue900)),
+                          pw.Text('Daily Hamali Distribution Report', style: const pw.TextStyle(fontSize: 12, color: PdfColors.grey700)),
+                        ],
+                      ),
                     ],
                   ),
-                  pw.Text('Date: $reportDate', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.end,
+                    children: [
+                      pw.Text('Report Date', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey600)),
+                      pw.Text(reportDate, style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold)),
+                    ],
+                  ),
                 ],
               ),
-              pw.SizedBox(height: 15),
+              pw.SizedBox(height: 18),
               pw.TableHelper.fromTextArray(
                 headers: ['S.No', 'Detail', 'Bags', 'Weight', 'Rate (Rs)', 'Total (Rs)', 'Notes'],
                 data: filtered.map((e) => [
@@ -404,13 +503,13 @@ class _HomeScreenState extends State<HomeScreen> {
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
-                  pw.Text('Total Bags: $dayBags Bags', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 13)),
+                  pw.Text('Total Bags for the Day: $dayBags Bags', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 13)),
                   pw.Text('Grand Total: Rs. ${dayTotal.toStringAsFixed(2)}', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: PdfColors.blue900)),
                 ],
               ),
               pw.Spacer(),
               pw.Center(
-                child: pw.Text('Generated via Pragya Hamali App • Made by Harshit', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey600)),
+                child: pw.Text('Generated via Pragya Hamali App • Built by Harshit', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600)),
               )
             ],
           );
@@ -431,33 +530,39 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: const Color(0xFF0A2540),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: const [
-            Text('Pragya Products', style: TextStyle(fontWeight: FontWeight.w900, color: Colors.white, fontSize: 18)),
-            Text('Made by Harshit', style: TextStyle(color: Color(0xFF00D4B2), fontSize: 11, fontWeight: FontWeight.w600)),
+        backgroundColor: const Color(0xFF081C30),
+        title: Row(
+          children: [
+            const PragyaBrandLogo(size: 36, isDark: true),
+            const SizedBox(width: 10),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                Text('Pragya Products', style: TextStyle(fontWeight: FontWeight.w900, color: Colors.white, fontSize: 17)),
+                Text('Made by Harshit', style: TextStyle(color: Color(0xFF00D4B2), fontSize: 11, fontWeight: FontWeight.w700)),
+              ],
+            ),
           ],
         ),
         actions: [
           IconButton(
-            icon: Icon(_isLocked ? Icons.lock : Icons.lock_open, color: _isLocked ? Colors.redAccent : const Color(0xFF00D4B2)),
+            icon: Icon(_isLocked ? Icons.lock_rounded : Icons.lock_open_rounded, color: _isLocked ? Colors.redAccent : const Color(0xFF00D4B2)),
             onPressed: _toggleLock,
           ),
           IconButton(
-            icon: const Icon(Icons.picture_as_pdf_outlined, color: Colors.white),
+            icon: const Icon(Icons.picture_as_pdf_rounded, color: Colors.white),
             onPressed: filtered.isEmpty ? null : _exportPdf,
           ),
         ],
       ),
       body: Center(
         child: Container(
-          constraints: const BoxConstraints(maxWidth: 800),
+          constraints: const BoxConstraints(maxWidth: 850),
           child: Column(
             children: [
               Card(
                 margin: const EdgeInsets.all(12),
-                elevation: 2,
+                elevation: 1.5,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 color: Colors.white,
                 child: Padding(
@@ -480,10 +585,10 @@ class _HomeScreenState extends State<HomeScreen> {
                                 child: Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    const Icon(Icons.calendar_month, size: 18, color: Color(0xFF0A2540)),
+                                    const Icon(Icons.calendar_month_rounded, size: 18, color: Color(0xFF0A2540)),
                                     const SizedBox(width: 8),
                                     Text(
-                                      'Date: $dateString',
+                                      'Active Date: $dateString',
                                       style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF0A2540)),
                                     ),
                                   ],
@@ -594,12 +699,12 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: ElevatedButton.icon(
                           onPressed: _addEntry,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF0A2540),
+                            backgroundColor: const Color(0xFF081C30),
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           ),
-                          icon: const Icon(Icons.add_circle_outline, color: Color(0xFF00D4B2)),
+                          icon: const Icon(Icons.add_circle_outline_rounded, color: Color(0xFF00D4B2)),
                           label: const Text('ADD ENTRY', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5)),
                         ),
                       ),
@@ -613,7 +718,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Entries: $dateString', style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF0A2540))),
+                    Text('Entries for $dateString', style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF0A2540))),
                     Text('${filtered.length} entries', style: const TextStyle(fontSize: 12, color: Colors.grey)),
                   ],
                 ),
@@ -633,11 +738,11 @@ class _HomeScreenState extends State<HomeScreen> {
                           final item = filtered[idx];
                           return Card(
                             margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                            elevation: 1,
+                            elevation: 0.8,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             child: ListTile(
                               leading: CircleAvatar(
-                                backgroundColor: const Color(0xFF0A2540),
+                                backgroundColor: const Color(0xFF081C30),
                                 foregroundColor: const Color(0xFF00D4B2),
                                 child: Text('${item.sNo}', style: const TextStyle(fontWeight: FontWeight.bold)),
                               ),
@@ -649,7 +754,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   Text('₹${item.total.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: Color(0xFF00897B))),
                                   const SizedBox(width: 4),
                                   IconButton(
-                                    icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
+                                    icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 20),
                                     onPressed: () => _deleteEntry(item),
                                   ),
                                 ],
