@@ -84,7 +84,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final List<HamaliEntry> _entries = [];
+  final List<HamaliEntry> _allEntries = [];
   bool _isLocked = false;
   final String _adminPin = "1234";
 
@@ -113,8 +113,8 @@ class _HomeScreenState extends State<HomeScreen> {
     if (rawData != null) {
       final List decoded = jsonDecode(rawData);
       setState(() {
-        _entries.clear();
-        _entries.addAll(decoded.map((e) => HamaliEntry.fromMap(e)).toList());
+        _allEntries.clear();
+        _allEntries.addAll(decoded.map((e) => HamaliEntry.fromMap(e)).toList());
       });
     }
     if (lockedStatus != null) {
@@ -124,7 +124,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _saveData() async {
     final prefs = await SharedPreferences.getInstance();
-    final String encoded = jsonEncode(_entries.map((e) => e.toMap()).toList());
+    final String encoded = jsonEncode(_allEntries.map((e) => e.toMap()).toList());
     await prefs.setString('daily_entries', encoded);
     await prefs.setBool('is_locked', _isLocked);
   }
@@ -139,6 +139,11 @@ class _HomeScreenState extends State<HomeScreen> {
     if (picked != null && picked != _selectedDate) {
       setState(() => _selectedDate = picked);
     }
+  }
+
+  List<HamaliEntry> get _filteredEntries {
+    final formattedDate = DateFormat('dd/MM/yyyy').format(_selectedDate);
+    return _allEntries.where((e) => e.date == formattedDate).toList();
   }
 
   void _addEntry() {
@@ -163,9 +168,12 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
+    final String formattedDate = DateFormat('dd/MM/yyyy').format(_selectedDate);
+    final currentDayCount = _filteredEntries.length;
+
     final newEntry = HamaliEntry(
-      sNo: _entries.length + 1,
-      date: DateFormat('dd/MM/yyyy').format(_selectedDate),
+      sNo: currentDayCount + 1,
+      date: formattedDate,
       detail: finalWork,
       bags: bags,
       weightPerBag: finalWeight,
@@ -176,7 +184,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
 
     setState(() {
-      _entries.add(newEntry);
+      _allEntries.add(newEntry);
       _bagsController.clear();
       _priceController.clear();
       _descController.clear();
@@ -187,10 +195,10 @@ class _HomeScreenState extends State<HomeScreen> {
     _saveData();
   }
 
-  void _deleteEntry(int index) {
+  void _deleteEntry(HamaliEntry entryToDelete) {
     if (_isLocked) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Sheet is Locked! Unlock with PIN to delete entries.')),
+        const SnackBar(content: Text('Sheet is Locked! Unlock with PIN to delete.')),
       );
       return;
     }
@@ -199,27 +207,23 @@ class _HomeScreenState extends State<HomeScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Delete Entry?'),
-        content: Text('Kya aap S.No #${_entries[index].sNo} entry ko delete karna chahte hain?'),
+        content: Text('Kya aap S.No #${entryToDelete.sNo} entry delete karna chahte hain?'),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
             onPressed: () {
               setState(() {
-                _entries.removeAt(index);
-                // Serial numbers re-index karna
-                for (int i = 0; i < _entries.length; i++) {
-                  _entries[i].sNo = i + 1;
+                _allEntries.remove(entryToDelete);
+                // Selected date ki entries ka serial number re-order karna
+                final dayEntries = _allEntries.where((e) => e.date == entryToDelete.date).toList();
+                for (int i = 0; i < dayEntries.length; i++) {
+                  dayEntries[i].sNo = i + 1;
                 }
               });
               _saveData();
               Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Entry deleted successfully!')),
-              );
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Entry deleted successfully!')));
             },
             child: const Text('Delete'),
           ),
@@ -263,10 +267,18 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _exportPdf() async {
+    final filtered = _filteredEntries;
+    if (filtered.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Selected date me koi entry nahi hai export karne ke liye!')),
+      );
+      return;
+    }
+
     final pdf = pw.Document();
-    final grandTotal = _entries.fold<double>(0, (prev, el) => prev + el.total);
-    final totalBags = _entries.fold<int>(0, (prev, el) => prev + el.bags);
-    final currentDate = DateFormat('dd/MM/yyyy').format(DateTime.now());
+    final dayTotal = filtered.fold<double>(0, (prev, el) => prev + el.total);
+    final dayBags = filtered.fold<int>(0, (prev, el) => prev + el.bags);
+    final reportDate = DateFormat('dd/MM/yyyy').format(_selectedDate);
 
     pdf.addPage(
       pw.Page(
@@ -277,13 +289,13 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               pw.Text('Pragya Products', style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
               pw.Text('Daily Hamali Distribution Report', style: const pw.TextStyle(fontSize: 16)),
-              pw.Text('Export Date: $currentDate', style: const pw.TextStyle(fontSize: 12, color: PdfColors.grey700)),
+              pw.SizedBox(height: 4),
+              pw.Text('Report Date: $reportDate', style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: PdfColors.blueGrey800)),
               pw.SizedBox(height: 15),
               pw.TableHelper.fromTextArray(
-                headers: ['S.No', 'Date', 'Detail', 'Bags', 'Weight', 'Rate', 'Total', 'Notes'],
-                data: _entries.map((e) => [
+                headers: ['S.No', 'Detail', 'Bags', 'Weight', 'Rate', 'Total', 'Notes'],
+                data: filtered.map((e) => [
                   e.sNo.toString(),
-                  e.date,
                   e.detail,
                   e.bags.toString(),
                   e.weightPerBag,
@@ -300,8 +312,8 @@ class _HomeScreenState extends State<HomeScreen> {
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
-                  pw.Text('Total Bags: $totalBags Bags', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                  pw.Text('Grand Total: Rs. ${grandTotal.toStringAsFixed(2)}', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+                  pw.Text('Total Bags for the Day: $dayBags Bags', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                  pw.Text('Day Total: Rs. ${dayTotal.toStringAsFixed(2)}', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
                 ],
               ),
             ],
@@ -315,8 +327,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final grandTotal = _entries.fold<double>(0, (prev, el) => prev + el.total);
-    final totalBags = _entries.fold<int>(0, (prev, el) => prev + el.bags);
+    final filtered = _filteredEntries;
+    final dayTotal = filtered.fold<double>(0, (prev, el) => prev + el.total);
+    final dayBags = filtered.fold<int>(0, (prev, el) => prev + el.bags);
+    final dateString = DateFormat('dd/MM/yyyy').format(_selectedDate);
 
     return Scaffold(
       appBar: AppBar(
@@ -329,7 +343,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.share, color: Colors.white),
-            onPressed: _entries.isEmpty ? null : _exportPdf,
+            onPressed: filtered.isEmpty ? null : _exportPdf,
           ),
         ],
       ),
@@ -344,16 +358,22 @@ class _HomeScreenState extends State<HomeScreen> {
               padding: const EdgeInsets.all(12),
               child: Column(
                 children: [
-                  // Date Picker Row
+                  // Active Date Selector Button
                   Row(
                     children: [
                       Expanded(
-                        child: OutlinedButton.icon(
+                        child: ElevatedButton.icon(
                           onPressed: _pickDate,
-                          icon: const Icon(Icons.calendar_today, size: 16, color: Color(0xFF0F4C81)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFE3EEF8),
+                            foregroundColor: const Color(0xFF0F4C81),
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                          ),
+                          icon: const Icon(Icons.calendar_month, size: 20),
                           label: Text(
-                            'Date: ${DateFormat('dd/MM/yyyy').format(_selectedDate)}',
-                            style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0F4C81)),
+                            'Selected Date: $dateString (Tap to Change)',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                           ),
                         ),
                       ),
@@ -445,14 +465,37 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
 
-          // Entries List View with Delete Action
+          // Date Filter Heading
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Entries for $dateString',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.blueGrey),
+                ),
+                Text(
+                  '${filtered.length} entries',
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+              ],
+            ),
+          ),
+
+          // Filtered Entries List View
           Expanded(
-            child: _entries.isEmpty
-                ? const Center(child: Text('Aaj ki koi entry nahi hai. Nayi entry add karein.'))
+            child: filtered.isEmpty
+                ? Center(
+                    child: Text(
+                      '$dateString ki koi entry nahi hai.',
+                      style: const TextStyle(color: Colors.grey, fontSize: 14),
+                    ),
+                  )
                 : ListView.builder(
-                    itemCount: _entries.length,
+                    itemCount: filtered.length,
                     itemBuilder: (ctx, idx) {
-                      final item = _entries[idx];
+                      final item = filtered[idx];
                       return Card(
                         margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                         child: Padding(
@@ -468,7 +511,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               style: const TextStyle(fontWeight: FontWeight.bold),
                             ),
                             subtitle: Text(
-                              '📅 ${item.date} | Rate: ₹${item.pricePerBag} | Note: ${item.description.isEmpty ? "None" : item.description}',
+                              'Rate: ₹${item.pricePerBag} | Time: ${item.timeStamp}\nNote: ${item.description.isEmpty ? "None" : item.description}',
                             ),
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
@@ -480,7 +523,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 const SizedBox(width: 4),
                                 IconButton(
                                   icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 22),
-                                  onPressed: () => _deleteEntry(idx),
+                                  onPressed: () => _deleteEntry(item),
                                   tooltip: 'Delete Entry',
                                 ),
                               ],
@@ -492,7 +535,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
           ),
 
-          // Grand Total Footer
+          // Daily Grand Total Footer
           Container(
             padding: const EdgeInsets.all(16),
             decoration: const BoxDecoration(
@@ -505,15 +548,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Total Bags: $totalBags', style: const TextStyle(fontSize: 14, color: Colors.grey)),
+                    Text('Day Bags: $dayBags Bags', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87)),
                     Text(_isLocked ? '🔒 Sheet Locked' : '🔓 Active Mode', style: TextStyle(fontSize: 12, color: _isLocked ? Colors.red : Colors.green)),
                   ],
                 ),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    const Text('Grand Total', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                    Text('₹ ${grandTotal.toStringAsFixed(2)}', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF0F4C81))),
+                    Text('Total ($dateString)', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                    Text('₹ ${dayTotal.toStringAsFixed(2)}', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF0F4C81))),
                   ],
                 )
               ],
