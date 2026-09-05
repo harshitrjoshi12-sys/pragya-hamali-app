@@ -33,7 +33,7 @@ class PragyaHamaliApp extends StatelessWidget {
   }
 }
 
-// ================= DESIGNABLE BRAND LOGO WIDGET =================
+// ================= BRAND LOGO =================
 class PragyaBrandLogo extends StatelessWidget {
   final double size;
   final bool isDark;
@@ -117,7 +117,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
     Future.delayed(const Duration(seconds: 3), () {
       if (mounted) {
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const HomeScreen()));
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const MainNavigationShell()));
       }
     });
   }
@@ -244,30 +244,19 @@ class HamaliEntry {
       );
 }
 
-// ================= MAIN HOME SCREEN =================
-class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+// ================= NAVIGATION SHELL (BOTTOM BAR) =================
+class MainNavigationShell extends StatefulWidget {
+  const MainNavigationShell({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  State<MainNavigationShell> createState() => _MainNavigationShellState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _MainNavigationShellState extends State<MainNavigationShell> {
+  int _currentIndex = 0;
   final List<HamaliEntry> _allEntries = [];
   bool _isLocked = false;
   final String _adminPin = "1234";
-
-  DateTime _selectedDate = DateTime.now();
-  String _selectedWork = 'Truck Load';
-  String _selectedWeight = '50 Kg';
-  final TextEditingController _customWorkController = TextEditingController();
-  final TextEditingController _customWeightController = TextEditingController();
-  final TextEditingController _bagsController = TextEditingController();
-  final TextEditingController _priceController = TextEditingController();
-  final TextEditingController _descController = TextEditingController();
-
-  final List<String> _workOptions = ['Truck Load', 'Truck Unload', 'Load from Stack', 'Fill & Stack', 'Custom (Manual)'];
-  final List<String> _weightOptions = ['30 Kg', '40 Kg', '50 Kg', 'Custom (Manual)'];
 
   @override
   void initState() {
@@ -296,105 +285,6 @@ class _HomeScreenState extends State<HomeScreen> {
     final String encoded = jsonEncode(_allEntries.map((e) => e.toMap()).toList());
     await prefs.setString('daily_entries', encoded);
     await prefs.setBool('is_locked', _isLocked);
-  }
-
-  Future<void> _pickDate() async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: _selectedDate,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2030),
-    );
-    if (picked != null && picked != _selectedDate) {
-      setState(() => _selectedDate = picked);
-    }
-  }
-
-  List<HamaliEntry> get _filteredEntries {
-    final formattedDate = DateFormat('dd/MM/yyyy').format(_selectedDate);
-    return _allEntries.where((e) => e.date == formattedDate).toList();
-  }
-
-  void _addEntry() {
-    if (_isLocked) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sheet is Locked! Unlock with PIN first.')));
-      return;
-    }
-
-    final int? bags = int.tryParse(_bagsController.text);
-    final double? price = double.tryParse(_priceController.text);
-
-    if (bags == null || price == null || bags <= 0 || price <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter valid Bags & Rate')));
-      return;
-    }
-
-    final String finalWork = _selectedWork == 'Custom (Manual)' ? _customWorkController.text.trim() : _selectedWork;
-    final String finalWeight = _selectedWeight == 'Custom (Manual)' ? _customWeightController.text.trim() : _selectedWeight;
-
-    if (finalWork.isEmpty || finalWeight.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Work Detail & Weight are required')));
-      return;
-    }
-
-    final String formattedDate = DateFormat('dd/MM/yyyy').format(_selectedDate);
-    final currentDayCount = _filteredEntries.length;
-
-    final newEntry = HamaliEntry(
-      sNo: currentDayCount + 1,
-      date: formattedDate,
-      detail: finalWork,
-      bags: bags,
-      weightPerBag: finalWeight,
-      pricePerBag: price,
-      total: bags * price,
-      description: _descController.text.trim(),
-      timeStamp: DateFormat('hh:mm a').format(DateTime.now()),
-    );
-
-    setState(() {
-      _allEntries.add(newEntry);
-      _bagsController.clear();
-      _priceController.clear();
-      _descController.clear();
-      _customWorkController.clear();
-      _customWeightController.clear();
-    });
-
-    _saveData();
-  }
-
-  void _deleteEntry(HamaliEntry entryToDelete) {
-    if (_isLocked) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sheet is Locked! Unlock with PIN to delete.')));
-      return;
-    }
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete Entry?'),
-        content: Text('S.No #${entryToDelete.sNo} entry delete karni hai?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
-            onPressed: () {
-              setState(() {
-                _allEntries.remove(entryToDelete);
-                final dayEntries = _allEntries.where((e) => e.date == entryToDelete.date).toList();
-                for (int i = 0; i < dayEntries.length; i++) {
-                  dayEntries[i].sNo = i + 1;
-                }
-              });
-              _saveData();
-              Navigator.pop(ctx);
-            },
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
   }
 
   void _toggleLock() {
@@ -428,17 +318,15 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Future<void> _exportPdf() async {
-    final filtered = _filteredEntries;
-    if (filtered.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No entries found for the selected date!')));
+  static Future<void> exportDatePdf(BuildContext context, String reportDate, List<HamaliEntry> entries) async {
+    if (entries.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No entries to export for this date!')));
       return;
     }
 
     final pdf = pw.Document();
-    final dayTotal = filtered.fold<double>(0, (prev, el) => prev + el.total);
-    final dayBags = filtered.fold<int>(0, (prev, el) => prev + el.bags);
-    final reportDate = DateFormat('dd/MM/yyyy').format(_selectedDate);
+    final dayTotal = entries.fold<double>(0, (prev, el) => prev + el.total);
+    final dayBags = entries.fold<int>(0, (prev, el) => prev + el.bags);
 
     pdf.addPage(
       pw.Page(
@@ -485,7 +373,7 @@ class _HomeScreenState extends State<HomeScreen> {
               pw.SizedBox(height: 18),
               pw.TableHelper.fromTextArray(
                 headers: ['S.No', 'Detail', 'Bags', 'Weight', 'Rate (Rs)', 'Total (Rs)', 'Notes'],
-                data: filtered.map((e) => [
+                data: entries.map((e) => [
                   e.sNo.toString(),
                   e.detail,
                   e.bags.toString(),
@@ -503,7 +391,7 @@ class _HomeScreenState extends State<HomeScreen> {
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
-                  pw.Text('Total Bags for the Day: $dayBags Bags', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 13)),
+                  pw.Text('Total Bags: $dayBags Bags', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 13)),
                   pw.Text('Grand Total: Rs. ${dayTotal.toStringAsFixed(2)}', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: PdfColors.blue900)),
                 ],
               ),
@@ -522,18 +410,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final filtered = _filteredEntries;
-    final dayTotal = filtered.fold<double>(0, (prev, el) => prev + el.total);
-    final dayBags = filtered.fold<int>(0, (prev, el) => prev + el.bags);
-    final dateString = DateFormat('dd/MM/yyyy').format(_selectedDate);
-
     return Scaffold(
       appBar: AppBar(
         elevation: 0,
         backgroundColor: const Color(0xFF081C30),
         title: Row(
           children: [
-            const PragyaBrandLogo(size: 36, isDark: true),
+            const PragyaBrandLogo(size: 34, isDark: true),
             const SizedBox(width: 10),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -548,251 +431,637 @@ class _HomeScreenState extends State<HomeScreen> {
           IconButton(
             icon: Icon(_isLocked ? Icons.lock_rounded : Icons.lock_open_rounded, color: _isLocked ? Colors.redAccent : const Color(0xFF00D4B2)),
             onPressed: _toggleLock,
-          ),
-          IconButton(
-            icon: const Icon(Icons.picture_as_pdf_rounded, color: Colors.white),
-            onPressed: filtered.isEmpty ? null : _exportPdf,
+            tooltip: _isLocked ? 'Unlock Sheet' : 'Lock Sheet',
           ),
         ],
       ),
-      body: Center(
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 850),
-          child: Column(
-            children: [
-              Card(
-                margin: const EdgeInsets.all(12),
-                elevation: 1.5,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                color: Colors.white,
-                child: Padding(
-                  padding: const EdgeInsets.all(14),
-                  child: Column(
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: InkWell(
-                              onTap: _pickDate,
-                              borderRadius: BorderRadius.circular(10),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFEBF3FB),
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(color: const Color(0xFF0A2540).withOpacity(0.15)),
-                                ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    const Icon(Icons.calendar_month_rounded, size: 18, color: Color(0xFF0A2540)),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      'Active Date: $dateString',
-                                      style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF0A2540)),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: DropdownButtonFormField<String>(
-                              value: _selectedWork,
-                              decoration: InputDecoration(
-                                labelText: 'Work Type',
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                              ),
-                              items: _workOptions.map((w) => DropdownMenuItem(value: w, child: Text(w, style: const TextStyle(fontSize: 13)))).toList(),
-                              onChanged: (val) => setState(() => _selectedWork = val!),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: DropdownButtonFormField<String>(
-                              value: _selectedWeight,
-                              decoration: InputDecoration(
-                                labelText: 'Weight',
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                              ),
-                              items: _weightOptions.map((w) => DropdownMenuItem(value: w, child: Text(w, style: const TextStyle(fontSize: 13)))).toList(),
-                              onChanged: (val) => setState(() => _selectedWeight = val!),
-                            ),
-                          ),
-                        ],
-                      ),
-                      if (_selectedWork == 'Custom (Manual)' || _selectedWeight == 'Custom (Manual)') const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          if (_selectedWork == 'Custom (Manual)')
-                            Expanded(
-                              child: TextField(
-                                controller: _customWorkController,
-                                decoration: InputDecoration(
-                                  labelText: 'Custom Work Detail',
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                                ),
-                              ),
-                            ),
-                          if (_selectedWork == 'Custom (Manual)' && _selectedWeight == 'Custom (Manual)') const SizedBox(width: 8),
-                          if (_selectedWeight == 'Custom (Manual)')
-                            Expanded(
-                              child: TextField(
-                                controller: _customWeightController,
-                                decoration: InputDecoration(
-                                  labelText: 'Custom Weight',
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _bagsController,
-                              keyboardType: TextInputType.number,
-                              decoration: InputDecoration(
-                                labelText: 'Bags Count',
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: TextField(
-                              controller: _priceController,
-                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                              decoration: InputDecoration(
-                                labelText: 'Rate / Bag (₹)',
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: _descController,
-                        decoration: InputDecoration(
-                          labelText: 'Vehicle No / Notes (Optional)',
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: _addEntry,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF081C30),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          ),
-                          icon: const Icon(Icons.add_circle_outline_rounded, color: Color(0xFF00D4B2)),
-                          label: const Text('ADD ENTRY', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+      body: _currentIndex == 0
+          ? HomeScreenTab(
+              allEntries: _allEntries,
+              isLocked: _isLocked,
+              onDataChanged: _saveData,
+            )
+          : SavedReportsTab(
+              allEntries: _allEntries,
+              onExportPdf: (date, entries) => exportDatePdf(context, date, entries),
+            ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _currentIndex,
+        onDestinationSelected: (idx) => setState(() => _currentIndex = idx),
+        indicatorColor: const Color(0xFF00D4B2).withOpacity(0.2),
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.edit_note_rounded),
+            selectedIcon: Icon(Icons.edit_note_rounded, color: Color(0xFF0A2540)),
+            label: 'Daily Entries',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.history_rounded),
+            selectedIcon: Icon(Icons.history_rounded, color: Color(0xFF0A2540)),
+            label: 'Saved Reports',
+          ),
+        ],
+      ),
+    );
+  }
+}
 
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+// ================= TAB 1: DAILY ENTRIES =================
+class HomeScreenTab extends StatefulWidget {
+  final List<HamaliEntry> allEntries;
+  final bool isLocked;
+  final VoidCallback onDataChanged;
+
+  const HomeScreenTab({
+    super.key,
+    required this.allEntries,
+    required this.isLocked,
+    required this.onDataChanged,
+  });
+
+  @override
+  State<HomeScreenTab> createState() => _HomeScreenTabState();
+}
+
+class _HomeScreenTabState extends State<HomeScreenTab> {
+  DateTime _selectedDate = DateTime.now();
+  String _selectedWork = 'Truck Load';
+  String _selectedWeight = '50 Kg';
+  final TextEditingController _customWorkController = TextEditingController();
+  final TextEditingController _customWeightController = TextEditingController();
+  final TextEditingController _bagsController = TextEditingController();
+  final TextEditingController _priceController = TextEditingController();
+  final TextEditingController _descController = TextEditingController();
+
+  final List<String> _workOptions = ['Truck Load', 'Truck Unload', 'Load from Stack', 'Fill & Stack', 'Custom (Manual)'];
+  final List<String> _weightOptions = ['30 Kg', '40 Kg', '50 Kg', 'Custom (Manual)'];
+
+  List<HamaliEntry> get _filteredEntries {
+    final formattedDate = DateFormat('dd/MM/yyyy').format(_selectedDate);
+    return widget.allEntries.where((e) => e.date == formattedDate).toList();
+  }
+
+  Future<void> _pickDate() async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2030),
+    );
+    if (picked != null && picked != _selectedDate) {
+      setState(() => _selectedDate = picked);
+    }
+  }
+
+  void _addEntry() {
+    if (widget.isLocked) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sheet Locked hai! Pehle unlock karein.')));
+      return;
+    }
+
+    final int? bags = int.tryParse(_bagsController.text);
+    final double? price = double.tryParse(_priceController.text);
+
+    if (bags == null || price == null || bags <= 0 || price <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Valid Bags & Rate enter karein')));
+      return;
+    }
+
+    final String finalWork = _selectedWork == 'Custom (Manual)' ? _customWorkController.text.trim() : _selectedWork;
+    final String finalWeight = _selectedWeight == 'Custom (Manual)' ? _customWeightController.text.trim() : _selectedWeight;
+
+    if (finalWork.isEmpty || finalWeight.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Work Detail & Weight specify karein')));
+      return;
+    }
+
+    final String formattedDate = DateFormat('dd/MM/yyyy').format(_selectedDate);
+    final currentDayCount = _filteredEntries.length;
+
+    final newEntry = HamaliEntry(
+      sNo: currentDayCount + 1,
+      date: formattedDate,
+      detail: finalWork,
+      bags: bags,
+      weightPerBag: finalWeight,
+      pricePerBag: price,
+      total: bags * price,
+      description: _descController.text.trim(),
+      timeStamp: DateFormat('hh:mm a').format(DateTime.now()),
+    );
+
+    setState(() {
+      widget.allEntries.add(newEntry);
+      _bagsController.clear();
+      _priceController.clear();
+      _descController.clear();
+      _customWorkController.clear();
+      _customWeightController.clear();
+    });
+
+    widget.onDataChanged();
+  }
+
+  void _deleteEntry(HamaliEntry entryToDelete) {
+    if (widget.isLocked) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sheet Locked hai! Unlock karein.')));
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Entry?'),
+        content: Text('S.No #${entryToDelete.sNo} entry delete karni hai?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+            onPressed: () {
+              setState(() {
+                widget.allEntries.remove(entryToDelete);
+                final dayEntries = widget.allEntries.where((e) => e.date == entryToDelete.date).toList();
+                for (int i = 0; i < dayEntries.length; i++) {
+                  dayEntries[i].sNo = i + 1;
+                }
+              });
+              widget.onDataChanged();
+              Navigator.pop(ctx);
+            },
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final filtered = _filteredEntries;
+    final dayTotal = filtered.fold<double>(0, (prev, el) => prev + el.total);
+    final dayBags = filtered.fold<int>(0, (prev, el) => prev + el.bags);
+    final dateString = DateFormat('dd/MM/yyyy').format(_selectedDate);
+
+    return Center(
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 850),
+        child: Column(
+          children: [
+            Card(
+              margin: const EdgeInsets.all(12),
+              elevation: 1.5,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              color: Colors.white,
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
                   children: [
-                    Text('Entries for $dateString', style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF0A2540))),
-                    Text('${filtered.length} entries', style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                  ],
-                ),
-              ),
-
-              Expanded(
-                child: filtered.isEmpty
-                    ? Center(
-                        child: Text(
-                          '$dateString ki koi entry nahi hai.',
-                          style: const TextStyle(color: Colors.grey),
-                        ),
-                      )
-                    : ListView.builder(
-                        itemCount: filtered.length,
-                        itemBuilder: (ctx, idx) {
-                          final item = filtered[idx];
-                          return Card(
-                            margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                            elevation: 0.8,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            child: ListTile(
-                              leading: CircleAvatar(
-                                backgroundColor: const Color(0xFF081C30),
-                                foregroundColor: const Color(0xFF00D4B2),
-                                child: Text('${item.sNo}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: InkWell(
+                            onTap: _pickDate,
+                            borderRadius: BorderRadius.circular(10),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEBF3FB),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: const Color(0xFF0A2540).withOpacity(0.15)),
                               ),
-                              title: Text('${item.bags} Bags — ${item.detail} (${item.weightPerBag})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                              subtitle: Text('Rate: ₹${item.pricePerBag} | Time: ${item.timeStamp}\n${item.description.isNotEmpty ? "Note: " + item.description : ""}'),
-                              trailing: Row(
-                                mainAxisSize: MainAxisSize.min,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Text('₹${item.total.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: Color(0xFF00897B))),
-                                  const SizedBox(width: 4),
-                                  IconButton(
-                                    icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 20),
-                                    onPressed: () => _deleteEntry(item),
+                                  const Icon(Icons.calendar_month_rounded, size: 18, color: Color(0xFF0A2540)),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Date: $dateString (Tap to Change)',
+                                    style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF0A2540)),
                                   ),
                                 ],
                               ),
                             ),
-                          );
-                        },
-                      ),
-              ),
-
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 6, offset: Offset(0, -2))],
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Total Bags: $dayBags', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0A2540))),
-                        Text(_isLocked ? '🔒 Locked' : '🔓 Active', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: _isLocked ? Colors.red : Colors.green)),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton.filledTonal(
+                          onPressed: filtered.isEmpty ? null : () => _MainNavigationShellState.exportDatePdf(context, dateString, filtered),
+                          icon: const Icon(Icons.picture_as_pdf_rounded, size: 20),
+                          tooltip: 'Export Current Day PDF',
+                        ),
                       ],
                     ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
+                    const SizedBox(height: 10),
+                    Row(
                       children: [
-                        const Text('Day Total', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                        Text('₹ ${dayTotal.toStringAsFixed(2)}', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFF0A2540))),
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            value: _selectedWork,
+                            decoration: InputDecoration(
+                              labelText: 'Work Type',
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                            items: _workOptions.map((w) => DropdownMenuItem(value: w, child: Text(w, style: const TextStyle(fontSize: 13)))).toList(),
+                            onChanged: (val) => setState(() => _selectedWork = val!),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            value: _selectedWeight,
+                            decoration: InputDecoration(
+                              labelText: 'Weight',
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                            items: _weightOptions.map((w) => DropdownMenuItem(value: w, child: Text(w, style: const TextStyle(fontSize: 13)))).toList(),
+                            onChanged: (val) => setState(() => _selectedWeight = val!),
+                          ),
+                        ),
                       ],
-                    )
+                    ),
+                    if (_selectedWork == 'Custom (Manual)' || _selectedWeight == 'Custom (Manual)') const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        if (_selectedWork == 'Custom (Manual)')
+                          Expanded(
+                            child: TextField(
+                              controller: _customWorkController,
+                              decoration: InputDecoration(
+                                labelText: 'Custom Work Detail',
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                            ),
+                          ),
+                        if (_selectedWork == 'Custom (Manual)' && _selectedWeight == 'Custom (Manual)') const SizedBox(width: 8),
+                        if (_selectedWeight == 'Custom (Manual)')
+                          Expanded(
+                            child: TextField(
+                              controller: _customWeightController,
+                              decoration: InputDecoration(
+                                labelText: 'Custom Weight',
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _bagsController,
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              labelText: 'Bags Count',
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            controller: _priceController,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration: InputDecoration(
+                              labelText: 'Rate / Bag (₹)',
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _descController,
+                      decoration: InputDecoration(
+                        labelText: 'Vehicle No / Notes (Optional)',
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: _addEntry,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF081C30),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        icon: const Icon(Icons.add_circle_outline_rounded, color: Color(0xFF00D4B2)),
+                        label: const Text('ADD ENTRY', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                      ),
+                    ),
                   ],
                 ),
-              )
-            ],
-          ),
+              ),
+            ),
+
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Entries for $dateString', style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF0A2540))),
+                  Text('${filtered.length} entries', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                ],
+              ),
+            ),
+
+            Expanded(
+              child: filtered.isEmpty
+                  ? Center(
+                      child: Text(
+                        '$dateString ki koi entry nahi hai.',
+                        style: const TextStyle(color: Colors.grey),
+                      ),
+                    )
+                  : ListView.builder(
+                      itemCount: filtered.length,
+                      itemBuilder: (ctx, idx) {
+                        final item = filtered[idx];
+                        return Card(
+                          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                          elevation: 0.8,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          child: ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: const Color(0xFF081C30),
+                              foregroundColor: const Color(0xFF00D4B2),
+                              child: Text('${item.sNo}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                            ),
+                            title: Text('${item.bags} Bags — ${item.detail} (${item.weightPerBag})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                            subtitle: Text('Rate: ₹${item.pricePerBag} | Time: ${item.timeStamp}\n${item.description.isNotEmpty ? "Note: " + item.description : ""}'),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text('₹${item.total.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: Color(0xFF00897B))),
+                                const SizedBox(width: 4),
+                                IconButton(
+                                  icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 20),
+                                  onPressed: () => _deleteEntry(item),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 6, offset: Offset(0, -2))],
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Day Bags: $dayBags', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0A2540))),
+                      Text(widget.isLocked ? '🔒 Locked' : '🔓 Active', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: widget.isLocked ? Colors.red : Colors.green)),
+                    ],
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text('Total ($dateString)', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                      Text('₹ ${dayTotal.toStringAsFixed(2)}', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFF0A2540))),
+                    ],
+                  )
+                ],
+              ),
+            )
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ================= TAB 2: SAVED REPORTS ARCHIVE =================
+class SavedReportsTab extends StatelessWidget {
+  final List<HamaliEntry> allEntries;
+  final Function(String date, List<HamaliEntry> entries) onExportPdf;
+
+  const SavedReportsTab({
+    super.key,
+    required this.allEntries,
+    required this.onExportPdf,
+  });
+
+  Map<String, List<HamaliEntry>> get _groupedReports {
+    final Map<String, List<HamaliEntry>> map = {};
+    for (var entry in allEntries) {
+      if (!map.containsKey(entry.date)) {
+        map[entry.date] = [];
+      }
+      map[entry.date]!.add(entry);
+    }
+    return map;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final grouped = _groupedReports;
+    final dates = grouped.keys.toList()..sort((a, b) => b.compareTo(a));
+
+    return Center(
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 850),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Day-wise Saved Reports',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF0A2540)),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0A2540).withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      '${dates.length} Days Recorded',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0A2540)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: dates.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: const [
+                          Icon(Icons.folder_open_rounded, size: 60, color: Colors.grey),
+                          SizedBox(height: 12),
+                          Text('Abhi tak koi entry save nahi hui hai.', style: TextStyle(color: Colors.grey)),
+                        ],
+                      ),
+                    )
+                  : ListView.builder(
+                      itemCount: dates.length,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      itemBuilder: (ctx, idx) {
+                        final date = dates[idx];
+                        final dayEntries = grouped[date]!;
+                        final totalBags = dayEntries.fold<int>(0, (prev, el) => prev + el.bags);
+                        final grandTotal = dayEntries.fold<double>(0, (prev, el) => prev + el.total);
+
+                        return Card(
+                          margin: const EdgeInsets.symmetric(vertical: 6),
+                          elevation: 1.5,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(14),
+                            onTap: () {
+                              _showDateBreakdownSheet(context, date, dayEntries, totalBags, grandTotal);
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF0A2540),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: const Icon(Icons.receipt_long_rounded, color: Color(0xFF00D4B2), size: 26),
+                                  ),
+                                  const SizedBox(width: 14),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Date: $date',
+                                          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: Color(0xFF0A2540)),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          'Bags: $totalBags | Entries: ${dayEntries.length}',
+                                          style: const TextStyle(fontSize: 13, color: Colors.grey, fontWeight: FontWeight.w600),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      Text(
+                                        '₹ ${grandTotal.toStringAsFixed(2)}',
+                                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF00897B)),
+                                      ),
+                                      const SizedBox(height: 6),
+                                      IconButton.filledTonal(
+                                        visualDensity: VisualDensity.compact,
+                                        onPressed: () => onExportPdf(date, dayEntries),
+                                        icon: const Icon(Icons.picture_as_pdf_rounded, size: 16),
+                                        tooltip: 'Print / Export PDF',
+                                      ),
+                                    ],
+                                  )
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showDateBreakdownSheet(BuildContext context, String date, List<HamaliEntry> entries, int totalBags, double grandTotal) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.65,
+        maxChildSize: 0.9,
+        minChildSize: 0.4,
+        builder: (_, scrollController) => Column(
+          children: [
+            Container(
+              margin: const EdgeInsets.symmetric(vertical: 8),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10)),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Report: $date', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
+                      Text('Total Bags: $totalBags | Grand Total: ₹ ${grandTotal.toStringAsFixed(2)}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                    ],
+                  ),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      onExportPdf(date, entries);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0A2540),
+                      foregroundColor: Colors.white,
+                    ),
+                    icon: const Icon(Icons.share, size: 16),
+                    label: const Text('PDF'),
+                  )
+                ],
+              ),
+            ),
+            const Divider(),
+            Expanded(
+              child: ListView.builder(
+                controller: scrollController,
+                itemCount: entries.length,
+                itemBuilder: (c, i) {
+                  final item = entries[i];
+                  return ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: const Color(0xFF0A2540),
+                      foregroundColor: const Color(0xFF00D4B2),
+                      child: Text('${item.sNo}'),
+                    ),
+                    title: Text('${item.bags} Bags — ${item.detail} (${item.weightPerBag})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                    subtitle: Text('Rate: ₹${item.pricePerBag} | ${item.timeStamp}\n${item.description.isNotEmpty ? item.description : ""}'),
+                    trailing: Text('₹${item.total.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: Color(0xFF00897B))),
+                  );
+                },
+              ),
+            ),
+          ],
         ),
       ),
     );
