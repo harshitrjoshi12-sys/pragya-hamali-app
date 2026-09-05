@@ -7,7 +7,15 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'dart:convert';
 
-Future<void> {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Apna Supabase URL aur Anon Key yahan paste karna
+  await Supabase.initialize(
+    url: 'APNA_SUPABASE_PROJECT_URL_YAHAN',
+    anonKey: 'APNI_SUPABASE_ANON_KEY_YAHAN',
+  );
+
   runApp(const PragyaHamaliApp());
 }
 
@@ -561,6 +569,22 @@ class _HomeScreenTabState extends State<HomeScreenTab> {
     });
 
     widget.onDataChanged();
+
+    // ================= SUPABASE AUTO-SYNC =================
+    try {
+      Supabase.instance.client.from('hamali_records').insert({
+        'worker_name': finalWork,
+        'bags_count': bags,
+        'total_amount': bags * price,
+        'truck_number': _descController.text.trim().isNotEmpty ? _descController.text.trim() : null,
+      }).then((_) {
+        debugPrint("Entry Supabase cloud me save ho gayi!");
+      }).catchError((error) {
+        debugPrint("Supabase error: $error");
+      });
+    } catch (e) {
+      debugPrint("Supabase connection exception: $e");
+    }
   }
 
   void _deleteEntry(HamaliEntry entryToDelete) {
